@@ -196,7 +196,7 @@ You can sanity-check a `.pt2` package with the AOTInductor loader:
 from torch._inductor import aoti_load_package
 
 runner = aoti_load_package("model.pt2", device_index=-1)  # -1 for CPU
-outputs = runner(example_input)
+outputs = runner(*example_inputs)  # unpack tuple for multi-input models
 for out in outputs:
     assert not out.isnan().any()
     assert not out.isinf().any()
