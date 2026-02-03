@@ -180,6 +180,51 @@ make export BACKEND=rocm MODEL_ARGS="--output model-rocm.pt2 --device cuda --ver
 
 **Note:** AOTInductor models are device-specific. A CPU model cannot run on GPU and vice versa. The .pt2 package contains architecture-specific kernels (HSACO for ROCm, cubin for CUDA).
 
+### Export Requirements and Gotchas
+
+- The exported model must return a plain `tuple[Tensor, ...]`. Wrap your model if it returns a dict, dataclass, or a single tensor.
+- Avoid data-dependent control flow in `forward` (use `torch.where`, not `if`).
+- Cast outputs to a consistent dtype (typically `float32`).
+- Store sizes as Python `int`, not tensors, to avoid guard errors.
+- If you have `@torch.compile` decorators, set `TORCH_COMPILE_DISABLE=1` during export to avoid FakeTensorMode conflicts.
+
+### Verify the Export
+
+You can sanity-check a `.pt2` package with the AOTInductor loader:
+
+```python
+from torch._inductor import aoti_load_package
+
+runner = aoti_load_package("model.pt2", device_index=-1)  # -1 for CPU
+outputs = runner(*example_inputs)  # unpack tuple for multi-input models
+for out in outputs:
+    assert not out.isnan().any()
+    assert not out.isinf().any()
+```
+
+### Portable Distribution
+
+For fully portable builds, use the `AOT_PORTABLE=1` environment variable. This copies runtime libraries into `target/portable/.../lib/` instead of creating symlinks:
+
+```bash
+AOT_PORTABLE=1 make build-portable
+```
+
+The binary embeds two RPATH entries:
+- Absolute path for the build machine (works immediately after build).
+- `$ORIGIN/lib` for deployed bundles.
+
+If you need a fully relocatable bundle, patch RPATH to use only `$ORIGIN/lib` and set RPATH on copied libraries (requires `patchelf`):
+
+```bash
+patchelf --set-rpath '$ORIGIN/lib' target/portable/release/inductor-rs
+for lib in target/portable/release/lib/*.so*; do
+    if [ -f "$lib" ] && ! [ -L "$lib" ]; then
+        patchelf --set-rpath '$ORIGIN' "$lib" 2>/dev/null || true
+    fi
+done
+```
+
 ## GPU Backend Details
 
 ### CUDA vs ROCm Comparison
@@ -268,6 +313,15 @@ def load_model() -> nn.Module:
 
 Edit `core/src/inference/model.rs` to add domain-specific output structures.
 
+## Optional Model Bundling Pattern
+
+If you want to ship models alongside the binary, a common pattern is:
+- Bundle a `models/` directory next to the executable.
+- Add a small lookup layer to select a preset (for example, `models/default/model.pt2`).
+- Allow overriding the models path with an environment variable (for example, `MODELS_DIR`).
+
+This repository does not implement model discovery yet, but the structure above keeps deployment simple and works well with portable builds.
+
 ## Testing
 
 ```bash
@@ -333,6 +387,14 @@ Built with `BACKEND=cuda` but ROCm PyTorch installed (or vice versa).
 python -c "import torch; print(torch.__version__)"
 # 2.9.1+cu128 -> use BACKEND=cuda
 # 2.9.1+rocm7.0 -> use BACKEND=rocm
+```
+
+### Export failures with FakeTensorMode
+
+If export fails with FakeTensorMode errors, disable `@torch.compile` during export:
+
+```bash
+TORCH_COMPILE_DISABLE=1 make export BACKEND=cpu MODEL_ARGS="--output model.pt2 --device cpu"
 ```
 
 ## License

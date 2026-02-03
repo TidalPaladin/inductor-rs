@@ -101,6 +101,13 @@ make export BACKEND=cuda MODEL_ARGS="--output model-cuda.pt2 --device cuda --ver
 make export BACKEND=rocm MODEL_ARGS="--output model-rocm.pt2 --device cuda --verify"
 ```
 
+**Export Notes**
+- Models must return a plain `tuple[Tensor, ...]`. Wrap dict/single outputs.
+- Avoid data-dependent control flow (use `torch.where`, not `if`).
+- Cast outputs to a consistent dtype (typically `float32`).
+- Store sizes as Python `int`, not tensors.
+- Set `TORCH_COMPILE_DISABLE=1` during export if `@torch.compile` is used.
+
 ## Project Overview
 
 This is a template for running AOT-compiled PyTorch Inductor models in Rust. It provides:
