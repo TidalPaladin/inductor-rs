@@ -1,0 +1,16 @@
+# Example configuration for inductor-rs
+#
+# This file shows the available configuration options.
+# Copy and modify for your specific use case.
+
+model:
+  # Path to the .pt2 model package
+  package_path: "model.pt2"
+
+  # Device to run inference on
+  # Options: "cpu", "cuda:0", "cuda:1", etc.
+  device: "cpu"
+
+inference:
+  # Batch size for inference
+  batch_size: 1

@@ -1,0 +1,88 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inductor-rs-tools"  # CUSTOMIZE: Change to your project name
+version = "0.1.0"
+description = "Python tools for AOT model export"
+requires-python = ">=3.13"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+dependencies = [
+    "torch>=2.1",
+    "safetensors",
+    "pyyaml",
+]
+readme = "README.md"
+
+[project.license]
+text = "Apache-2.0"
+
+[dependency-groups]
+# Training dependencies - customize for your model
+training = [
+    "torchvision",
+    "pandas",
+    "matplotlib",
+    "tqdm",
+]
+
+# AOT export dependencies (minimal)
+export = []
+
+# Development
+dev = [
+    "basedpyright",
+    "ruff",
+    "pytest",
+]
+
+[tool.uv]
+# Prefer system Python over downloading managed versions
+python-preference = "only-system"
+# Don't build this as a Python package - just install dependencies
+package = false
+
+# PyTorch indexes for different backends
+# CUDA is the default. For ROCm, use: make init-training-rocm
+# Note: uv.lock pins CUDA torch; ROCm requires post-install replacement via uv pip
+
+# CUDA PyTorch - only use for torch packages (explicit = true)
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+# ROCm PyTorch (available for reference; use Makefile target for installation)
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.0"
+explicit = true
+
+# Pin torch packages to CUDA index
+[tool.uv.sources]
+torch = { index = "pytorch-cuda" }
+torchvision = { index = "pytorch-cuda" }
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py311"
+include = ["pyproject.toml", "python/scripts/**/*.py"]
+exclude = ["_version.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.basedpyright]
+include = ["python/scripts"]
+exclude = ["**/__pycache__", "**/.pytest_cache"]
+pythonVersion = "3.11"
+pythonPlatform = "Linux"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+python_files = ["test_*.py"]
