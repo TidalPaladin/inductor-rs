@@ -32,7 +32,7 @@ pub enum Commands {
         #[arg(short, long, default_value = "json")]
         format: String,
 
-        /// Path to optional config file.
+        /// Path to optional config file (template only; not applied unless wired in).
         #[arg(short, long)]
         config: Option<PathBuf>,
     },

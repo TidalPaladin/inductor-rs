@@ -5,7 +5,6 @@ import sys
 
 import torch
 
-
 CUDA_TOKENS = ("nvidia", "geforce", "quadro", "tesla", "rtx")
 ROCM_TOKENS = ("amd", "radeon", "instinct", "mi", "gfx")
 

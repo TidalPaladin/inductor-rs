@@ -14,7 +14,7 @@ This template provides a complete infrastructure for running PyTorch models comp
 ## Prerequisites
 
 - Rust 1.70+ (2021 edition)
-- Python 3.11+
+- Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - CMake 3.18+
 - PyTorch 2.1+ (installed in Python environment)
@@ -60,7 +60,7 @@ make test-fixtures
 ./target/release/inductor-rs infer \
     --model tests/fixtures/dummy_model.pt2 \
     --device cpu \
-    --input input.json
+    --input tests/fixtures/input.json
 ```
 
 ## Building
@@ -119,7 +119,7 @@ make build BACKEND=rocm
 
 ```bash
 # Run inference
-inductor-rs infer --model model.pt2 --device cpu --input input.json
+inductor-rs infer --model model.pt2 --device cpu --input tests/fixtures/input.json
 
 # Show model info
 inductor-rs info --model model.pt2
@@ -138,6 +138,13 @@ Input data is provided as JSON:
     "shape": [1, 1, 224, 224]
 }
 ```
+
+The length of `data` must match the product of the `shape` dimensions.
+
+### Configuration (Template)
+
+`--config` and `config/example.yaml` are illustrative only and not applied by the CLI.
+Downstream projects should either wire configuration into the CLI or remove it.
 
 ### Rust API
 

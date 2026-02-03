@@ -67,7 +67,7 @@ torchvision = { index = "pytorch-cuda" }
 [tool.ruff]
 line-length = 120
 indent-width = 4
-target-version = "py311"
+target-version = "py313"
 include = ["pyproject.toml", "python/scripts/**/*.py"]
 exclude = ["_version.py"]
 
@@ -77,7 +77,7 @@ extend-select = ["I"]
 [tool.basedpyright]
 include = ["python/scripts"]
 exclude = ["**/__pycache__", "**/.pytest_cache"]
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 pythonPlatform = "Linux"
 typeCheckingMode = "basic"
 venvPath = "."

@@ -127,8 +127,11 @@ def verify(
     from torch._inductor import aoti_load_package
 
     device_index = -1
-    if device != "cpu" and ":" in device:
-        device_index = int(device.split(":")[1])
+    if device != "cpu":
+        if ":" in device:
+            device_index = int(device.split(":")[1])
+        else:
+            device_index = 0
 
     runner = aoti_load_package(model_path, device_index=device_index)
 

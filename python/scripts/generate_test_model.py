@@ -129,9 +129,16 @@ def verify(model_path: str, height: int, width: int, device: str = "cpu", batch_
     print(f"\nVerifying model at {model_path}...")
 
     # Load the compiled model
-    from torch._inductor.package import load_package
+    from torch._inductor import aoti_load_package
 
-    runner = load_package(model_path)
+    device_index = -1
+    if device != "cpu":
+        if ":" in device:
+            device_index = int(device.split(":")[1])
+        else:
+            device_index = 0
+
+    runner = aoti_load_package(model_path, device_index=device_index)
 
     def run_runner(runner_obj, inputs):
         if hasattr(runner_obj, "run"):

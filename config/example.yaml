@@ -2,6 +2,9 @@
 #
 # This file shows the available configuration options.
 # Copy and modify for your specific use case.
+#
+# Template note: the CLI does not apply this config by default.
+# Downstream projects should either wire it in or remove it.
 
 model:
   # Path to the .pt2 model package

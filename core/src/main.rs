@@ -1,6 +1,6 @@
 //! CLI entry point for inductor-rs.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use ndarray::ArrayD;
 use serde_json::Value;
 use std::fs;
@@ -70,19 +70,51 @@ fn main() -> Result<()> {
 
             // Parse input tensor from JSON
             // Expected format: { "data": [...], "shape": [B, C, H, W] }
-            let data: Vec<f32> = input_json["data"]
+            let data_array = input_json["data"]
                 .as_array()
-                .context("Input must have 'data' array")?
-                .iter()
-                .map(|v| v.as_f64().unwrap_or(0.0) as f32)
-                .collect();
+                .context("Input must have 'data' array")?;
+            let mut data = Vec::with_capacity(data_array.len());
+            for (i, v) in data_array.iter().enumerate() {
+                let value = v
+                    .as_f64()
+                    .with_context(|| format!("data[{i}] must be a number"))?;
+                data.push(value as f32);
+            }
 
-            let shape: Vec<usize> = input_json["shape"]
+            let shape_array = input_json["shape"]
                 .as_array()
-                .context("Input must have 'shape' array")?
-                .iter()
-                .map(|v| v.as_u64().unwrap_or(1) as usize)
-                .collect();
+                .context("Input must have 'shape' array")?;
+            let mut shape = Vec::with_capacity(shape_array.len());
+            for (i, v) in shape_array.iter().enumerate() {
+                let dim = v
+                    .as_i64()
+                    .or_else(|| v.as_u64().map(|u| u as i64))
+                    .or_else(|| {
+                        v.as_f64().and_then(|f| {
+                            if f.fract() == 0.0 {
+                                Some(f as i64)
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                    .with_context(|| format!("shape[{i}] must be an integer"))?;
+                if dim < 0 {
+                    bail!("shape[{i}] must be >= 0, got {dim}");
+                }
+                shape.push(dim as usize);
+            }
+
+            let expected_len = shape.iter().try_fold(1usize, |acc, &d| {
+                acc.checked_mul(d).context("Input shape product overflow")
+            })?;
+            if data.len() != expected_len {
+                bail!(
+                    "Input data length {} does not match shape product {}",
+                    data.len(),
+                    expected_len
+                );
+            }
 
             let input_tensor = ArrayD::from_shape_vec(ndarray::IxDyn(&shape), data)
                 .context("Failed to create input tensor")?;

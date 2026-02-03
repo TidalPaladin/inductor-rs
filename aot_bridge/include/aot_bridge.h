@@ -30,7 +30,8 @@ typedef struct AotResult AotResult;
 
 /* ============================================================================
  * Model Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Load an AOTInductor model from a .pt2 package.
@@ -44,25 +45,26 @@ typedef struct AotResult AotResult;
  * @return Pointer to loaded model, or NULL on error. Use aot_get_last_error()
  *         for error details.
  */
-AotModel* aot_model_load(const char* path, const char* device);
+AotModel *aot_model_load(const char *path, const char *device);
 
 /**
  * @brief Free a loaded model.
  *
  * @param model Pointer to model to free. Safe to call with NULL.
  */
-void aot_model_free(AotModel* model);
+void aot_model_free(AotModel *model);
 
 /**
  * @brief Get the last error message.
  *
  * @return Error message string. Valid until next API call.
  */
-const char* aot_get_last_error(void);
+const char *aot_get_last_error(void);
 
 /* ============================================================================
  * Tensor Operations
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a tensor from float data.
@@ -73,15 +75,15 @@ const char* aot_get_last_error(void);
  * @param device Device string.
  * @return Pointer to created tensor, or NULL on error.
  */
-AotTensor* aot_tensor_create(const float* data, const int64_t* shape, size_t ndim,
-                              const char* device);
+AotTensor *aot_tensor_create(const float *data, const int64_t *shape,
+                             size_t ndim, const char *device);
 
 /**
  * @brief Free a tensor.
  *
  * @param tensor Pointer to tensor to free. Safe to call with NULL.
  */
-void aot_tensor_free(AotTensor* tensor);
+void aot_tensor_free(AotTensor *tensor);
 
 /**
  * @brief Get pointer to tensor data.
@@ -92,7 +94,7 @@ void aot_tensor_free(AotTensor* tensor);
  * @param tensor Pointer to tensor.
  * @return Pointer to float data, or NULL on error.
  */
-const float* aot_tensor_data(AotTensor* tensor);
+const float *aot_tensor_data(AotTensor *tensor);
 
 /**
  * @brief Get tensor shape.
@@ -100,7 +102,7 @@ const float* aot_tensor_data(AotTensor* tensor);
  * @param tensor Pointer to tensor.
  * @return Pointer to shape array. Valid until tensor is freed.
  */
-const int64_t* aot_tensor_shape(const AotTensor* tensor);
+const int64_t *aot_tensor_shape(const AotTensor *tensor);
 
 /**
  * @brief Get number of tensor dimensions.
@@ -108,7 +110,7 @@ const int64_t* aot_tensor_shape(const AotTensor* tensor);
  * @param tensor Pointer to tensor.
  * @return Number of dimensions.
  */
-size_t aot_tensor_ndim(const AotTensor* tensor);
+size_t aot_tensor_ndim(const AotTensor *tensor);
 
 /**
  * @brief Get total number of elements in tensor.
@@ -116,11 +118,12 @@ size_t aot_tensor_ndim(const AotTensor* tensor);
  * @param tensor Pointer to tensor.
  * @return Number of elements.
  */
-size_t aot_tensor_numel(const AotTensor* tensor);
+size_t aot_tensor_numel(const AotTensor *tensor);
 
 /* ============================================================================
  * Inference
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Run inference on a model.
@@ -129,7 +132,7 @@ size_t aot_tensor_numel(const AotTensor* tensor);
  * @param input Input tensor.
  * @return Pointer to inference result, or NULL on error.
  */
-AotResult* aot_model_infer(AotModel* model, AotTensor* input);
+AotResult *aot_model_infer(AotModel *model, AotTensor *input);
 
 /**
  * @brief Free an inference result.
@@ -138,7 +141,7 @@ AotResult* aot_model_infer(AotModel* model, AotTensor* input);
  *
  * @param result Pointer to result to free. Safe to call with NULL.
  */
-void aot_result_free(AotResult* result);
+void aot_result_free(AotResult *result);
 
 /**
  * @brief Get the number of output tensors in the result.
@@ -146,7 +149,7 @@ void aot_result_free(AotResult* result);
  * @param result Pointer to inference result.
  * @return Number of output tensors.
  */
-size_t aot_result_num_outputs(const AotResult* result);
+size_t aot_result_num_outputs(const AotResult *result);
 
 /**
  * @brief Get an output tensor by index.
@@ -156,11 +159,12 @@ size_t aot_result_num_outputs(const AotResult* result);
  * @return Pointer to output tensor, or NULL if index out of range.
  *         Tensor is owned by the result and freed when result is freed.
  */
-AotTensor* aot_result_output(AotResult* result, size_t index);
+AotTensor *aot_result_output(AotResult *result, size_t index);
 
 /* ============================================================================
  * Timing Information
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get inference latency in milliseconds.
@@ -168,7 +172,7 @@ AotTensor* aot_result_output(AotResult* result, size_t index);
  * @param result Pointer to inference result.
  * @return Latency in milliseconds.
  */
-double aot_result_latency_ms(const AotResult* result);
+double aot_result_latency_ms(const AotResult *result);
 
 /**
  * @brief Get peak memory usage in bytes.
@@ -178,11 +182,12 @@ double aot_result_latency_ms(const AotResult* result);
  * @param result Pointer to inference result.
  * @return Memory usage in bytes.
  */
-size_t aot_result_memory_bytes(const AotResult* result);
+size_t aot_result_memory_bytes(const AotResult *result);
 
 /* ============================================================================
  * Device Testing
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Test basic tensor operations on a device.
@@ -195,7 +200,7 @@ size_t aot_result_memory_bytes(const AotResult* result);
  * @return 0 on success, non-zero on failure. Use aot_get_last_error()
  *         for error details.
  */
-int aot_test_device(const char* device);
+int aot_test_device(const char *device);
 
 #ifdef __cplusplus
 }

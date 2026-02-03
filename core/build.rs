@@ -7,13 +7,13 @@
 //!
 //! ## CUDA (NVIDIA)
 //! - Cargo feature: `cuda` (set via `BACKEND=cuda` in the Makefile)
-//! - PyTorch index: pytorch-cuda (cu126)
+//! - PyTorch index: pytorch-cuda (cu128)
 //! - Env: CUDA_HOME, CUDA_PATH
 //! - Libs symlinked to target/release/lib/
 //!
 //! ## ROCm (AMD)
 //! - Cargo feature: `rocm` (set via `BACKEND=rocm` in the Makefile)
-//! - PyTorch index: pytorch-rocm (rocm6.4)
+//! - PyTorch index: pytorch-rocm (rocm7.0)
 //! - Env: ROCM_PATH
 //! - CRITICAL: Libs NOT symlinked (ROCm $ORIGIN resolution issues)
 //! - Bridge RPATH points to torch/lib directly
@@ -32,13 +32,13 @@ use std::process::Command;
 /// PyTorch device variant detected from version string.
 #[derive(Debug, Clone, PartialEq)]
 enum TorchDevice {
-    Cuda(String), // e.g., "cu126"
-    Rocm(String), // e.g., "rocm6.4"
+    Cuda(String), // e.g., "cu128"
+    Rocm(String), // e.g., "rocm7.0"
     Cpu,
 }
 
 /// Parse the device variant from a torch version string.
-/// Examples: "2.9.1+cu126" -> Cuda("cu126"), "2.9.1+rocm6.4" -> Rocm("rocm6.4")
+/// Examples: "2.9.1+cu128" -> Cuda("cu128"), "2.9.1+rocm7.0" -> Rocm("rocm7.0")
 fn parse_torch_device(version: &str) -> TorchDevice {
     if let Some(suffix) = version.split('+').nth(1) {
         if suffix.starts_with("cu") {
@@ -214,10 +214,13 @@ fn build_aot_bridge() {
             .find(|p| Command::new(p).arg("--version").output().is_ok());
         (PathBuf::from(path), python)
     } else if let Some((path, python)) = detect_libtorch_from_python() {
-        println!(
-            "cargo:warning=Auto-detected PyTorch from Python: {}",
-            path.display()
-        );
+        let msg = format!("Auto-detected PyTorch from Python: {}", path.display());
+        let warn = env::var("AOT_WARN_LTORCH").map(|v| v == "1").unwrap_or(false);
+        if warn {
+            println!("cargo:warning={}", msg);
+        } else {
+            eprintln!("info: {}", msg);
+        }
         (path, Some(python))
     } else {
         panic!(
