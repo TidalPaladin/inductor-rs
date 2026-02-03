@@ -6,13 +6,13 @@
 //! # GPU Backend Support
 //!
 //! ## CUDA (NVIDIA)
-//! - Feature: `--features cuda`
+//! - Cargo feature: `cuda` (set via `BACKEND=cuda` in the Makefile)
 //! - PyTorch index: pytorch-cuda (cu126)
 //! - Env: CUDA_HOME, CUDA_PATH
 //! - Libs symlinked to target/release/lib/
 //!
 //! ## ROCm (AMD)
-//! - Feature: `--features rocm`
+//! - Cargo feature: `rocm` (set via `BACKEND=rocm` in the Makefile)
 //! - PyTorch index: pytorch-rocm (rocm6.4)
 //! - Env: ROCM_PATH
 //! - CRITICAL: Libs NOT symlinked (ROCm $ORIGIN resolution issues)
@@ -68,14 +68,14 @@ fn validate_torch_feature_match(version: &str) {
     let (required, installed, fix_cmd) = match (&device, feature_cuda, feature_rocm) {
         // CUDA feature but non-CUDA PyTorch
         (TorchDevice::Rocm(v), true, false) => {
-            ("CUDA", format!("ROCm ({})", v), "make init-training")
+            ("CUDA", format!("ROCm ({})", v), "make init BACKEND=cuda")
         }
-        (TorchDevice::Cpu, true, false) => ("CUDA", "CPU".to_string(), "make init-training"),
+        (TorchDevice::Cpu, true, false) => ("CUDA", "CPU".to_string(), "make init BACKEND=cuda"),
         // ROCm feature but non-ROCm PyTorch
         (TorchDevice::Cuda(v), false, true) => {
-            ("ROCm", format!("CUDA ({})", v), "make init-training-rocm")
+            ("ROCm", format!("CUDA ({})", v), "make init BACKEND=rocm")
         }
-        (TorchDevice::Cpu, false, true) => ("ROCm", "CPU".to_string(), "make init-training-rocm"),
+        (TorchDevice::Cpu, false, true) => ("ROCm", "CPU".to_string(), "make init BACKEND=rocm"),
         // Match - no error
         _ => return,
     };
@@ -108,21 +108,34 @@ fn validate_torch_feature_match(version: &str) {
 /// Detect libtorch from the current Python environment.
 ///
 /// Tries multiple Python executables in order:
-/// 1. `.venv/bin/python` - local venv (most common for this project)
-/// 2. `python3` - system Python 3
-/// 3. `python` - fallback
+/// 1. Backend venvs (`.venv-cuda`, `.venv-rocm`, `.venv`) in repo root
+/// 2. Backend venvs in `core/` (if present)
+/// 3. `python3` - system Python 3
+/// 4. `python` - fallback
 ///
 /// Returns (torch_path, python_executable) on success.
 fn detect_libtorch_from_python() -> Option<(PathBuf, PathBuf)> {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
     // Try these Python executables in order
-    let python_candidates = [
-        manifest_dir.join("../.venv/bin/python"), // Local venv first (parent dir)
-        manifest_dir.join(".venv/bin/python"),    // Local venv in core dir
-        PathBuf::from("python3"),
-        PathBuf::from("python"),
-    ];
+    let mut python_candidates = Vec::new();
+
+    // Prefer backend-specific venvs, then fall back to the default .venv
+    let venv_names: &[&str] = if cfg!(feature = "cuda") {
+        &[".venv-cuda", ".venv"]
+    } else if cfg!(feature = "rocm") {
+        &[".venv-rocm", ".venv"]
+    } else {
+        &[".venv", ".venv-cuda", ".venv-rocm"]
+    };
+
+    for name in venv_names {
+        python_candidates.push(manifest_dir.join(format!("../{}/bin/python", name)));
+        python_candidates.push(manifest_dir.join(format!("{}/bin/python", name)));
+    }
+
+    python_candidates.push(PathBuf::from("python3"));
+    python_candidates.push(PathBuf::from("python"));
 
     for python in &python_candidates {
         let output = Command::new(python)
@@ -187,14 +200,18 @@ fn build_aot_bridge() {
     let (libtorch, python) = if let Ok(path) = env::var("LIBTORCH") {
         // When LIBTORCH is set manually, try to find Python for version info
         let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-        let python = [
-            manifest_dir.join("../.venv/bin/python"),
-            manifest_dir.join(".venv/bin/python"),
-            PathBuf::from("python3"),
-            PathBuf::from("python"),
-        ]
-        .into_iter()
-        .find(|p| Command::new(p).arg("--version").output().is_ok());
+        let mut python_candidates = Vec::new();
+        let venv_names = [".venv", ".venv-cuda", ".venv-rocm"];
+        for name in venv_names {
+            python_candidates.push(manifest_dir.join(format!("../{}/bin/python", name)));
+            python_candidates.push(manifest_dir.join(format!("{}/bin/python", name)));
+        }
+        python_candidates.push(PathBuf::from("python3"));
+        python_candidates.push(PathBuf::from("python"));
+
+        let python = python_candidates
+            .into_iter()
+            .find(|p| Command::new(p).arg("--version").output().is_ok());
         (PathBuf::from(path), python)
     } else if let Some((path, python)) = detect_libtorch_from_python() {
         println!(
@@ -205,10 +222,10 @@ fn build_aot_bridge() {
     } else {
         panic!(
             "Could not find PyTorch installation.\n\
-             Checked: .venv/bin/python, python3, python\n\
+             Checked: .venv/.venv-cuda/.venv-rocm (repo and core), python3, python\n\
              \n\
              To fix, either:\n\
-             1. Create a venv with PyTorch: python -m venv .venv && .venv/bin/pip install torch\n\
+             1. Create a venv with PyTorch: make init BACKEND=cpu|cuda|rocm\n\
              2. Set LIBTORCH environment variable to your PyTorch installation"
         );
     };
@@ -248,8 +265,12 @@ fn build_aot_bridge() {
     // Build with CMake
     let mut cmake_config = cmake::Config::new(&bridge_dir);
 
-    // Set libtorch path
+    // Set libtorch path and force Torch discovery to this prefix
     cmake_config.define("CMAKE_PREFIX_PATH", &libtorch);
+    cmake_config.define(
+        "Torch_DIR",
+        libtorch.join("share/cmake/Torch").to_str().unwrap(),
+    );
 
     // Pass torch lib path for RPATH in the bridge library
     cmake_config.define("TORCH_LIB_PATH", lib_dir.to_str().unwrap());
@@ -363,6 +384,25 @@ fn build_aot_bridge() {
         let bridge_dst = profile_lib_dir.join("libaot_bridge.so");
         if let Err(e) = std::fs::copy(&bridge_src, &bridge_dst) {
             println!("cargo:warning=Failed to copy bridge library: {}", e);
+        }
+
+        // For ROCm builds, ensure no stale CUDA libs remain in the profile lib dir.
+        // This avoids loading mixed CUDA/ROCm libraries via $ORIGIN.
+        if cfg!(feature = "rocm") {
+            if let Ok(entries) = std::fs::read_dir(&profile_lib_dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name == "libaot_bridge.so" {
+                        continue;
+                    }
+                    let path = entry.path();
+                    let _ = if path.is_dir() {
+                        std::fs::remove_dir_all(&path)
+                    } else {
+                        std::fs::remove_file(&path)
+                    };
+                }
+            }
         }
 
         // Helper to copy or symlink a library

@@ -7,6 +7,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
+.venv-cuda/
+.venv-rocm/
 dist/
 *.egg-info/
 .eggs/

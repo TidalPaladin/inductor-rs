@@ -128,10 +128,10 @@ AotModel* aot_model_load(const char* path, const char* device_str) {
             // Create and immediately destroy a small tensor to trigger device init
             auto init_tensor = torch::empty({1}, torch::TensorOptions().device(device));
             // Synchronize to ensure device is fully initialized
-#ifdef USE_CUDA
-            c10::cuda::device_synchronize();
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
             c10::hip::device_synchronize();
+#elif defined(USE_CUDA)
+            c10::cuda::device_synchronize();
 #endif
         }
 
@@ -192,10 +192,10 @@ AotTensor* aot_tensor_create(const float* data, const int64_t* shape, size_t ndi
         tensor.copy_(cpu_tensor);
 
         // Full synchronization
-#ifdef USE_CUDA
-        c10::cuda::device_synchronize();
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         c10::hip::device_synchronize();
+#elif defined(USE_CUDA)
+        c10::cuda::device_synchronize();
 #endif
 
         return new AotTensor(std::move(tensor));
@@ -273,13 +273,13 @@ AotResult* aot_model_infer(AotModel* model, AotTensor* input) {
         input_tensor = input_tensor.contiguous();
 
         // Full synchronization before inference to ensure all GPU operations complete
-#ifdef USE_CUDA
-        if (model->device.is_cuda()) {
-            c10::cuda::device_synchronize();
-        }
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         if (model->device.is_cuda()) {
             c10::hip::device_synchronize();
+        }
+#elif defined(USE_CUDA)
+        if (model->device.is_cuda()) {
+            c10::cuda::device_synchronize();
         }
 #endif
 
@@ -288,28 +288,28 @@ AotResult* aot_model_infer(AotModel* model, AotTensor* input) {
 
         // Get GPU memory usage before inference
         size_t memory_before = 0;
-#ifdef USE_CUDA
-        if (model->device.is_cuda()) {
-            size_t free_mem, total_mem;
-            cudaMemGetInfo(&free_mem, &total_mem);
-            memory_before = total_mem - free_mem;
-        }
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         if (model->device.is_cuda()) {
             size_t free_mem, total_mem;
             hipMemGetInfo(&free_mem, &total_mem);
             memory_before = total_mem - free_mem;
         }
+#elif defined(USE_CUDA)
+        if (model->device.is_cuda()) {
+            size_t free_mem, total_mem;
+            cudaMemGetInfo(&free_mem, &total_mem);
+            memory_before = total_mem - free_mem;
+        }
 #endif
 
         // Synchronize before timing
-#ifdef USE_CUDA
-        if (model->device.is_cuda()) {
-            c10::cuda::device_synchronize();
-        }
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         if (model->device.is_cuda()) {
             c10::hip::device_synchronize();
+        }
+#elif defined(USE_CUDA)
+        if (model->device.is_cuda()) {
+            c10::cuda::device_synchronize();
         }
 #endif
 
@@ -318,13 +318,13 @@ AotResult* aot_model_infer(AotModel* model, AotTensor* input) {
         std::vector<torch::Tensor> outputs = model->loader->run(inputs);
 
         // Synchronize after inference
-#ifdef USE_CUDA
-        if (model->device.is_cuda()) {
-            c10::cuda::device_synchronize();
-        }
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         if (model->device.is_cuda()) {
             c10::hip::device_synchronize();
+        }
+#elif defined(USE_CUDA)
+        if (model->device.is_cuda()) {
+            c10::cuda::device_synchronize();
         }
 #endif
 
@@ -333,16 +333,16 @@ AotResult* aot_model_infer(AotModel* model, AotTensor* input) {
 
         // Get GPU memory usage after inference
         size_t memory_after = 0;
-#ifdef USE_CUDA
-        if (model->device.is_cuda()) {
-            size_t free_mem, total_mem;
-            cudaMemGetInfo(&free_mem, &total_mem);
-            memory_after = total_mem - free_mem;
-        }
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         if (model->device.is_cuda()) {
             size_t free_mem, total_mem;
             hipMemGetInfo(&free_mem, &total_mem);
+            memory_after = total_mem - free_mem;
+        }
+#elif defined(USE_CUDA)
+        if (model->device.is_cuda()) {
+            size_t free_mem, total_mem;
+            cudaMemGetInfo(&free_mem, &total_mem);
             memory_after = total_mem - free_mem;
         }
 #endif
@@ -414,22 +414,22 @@ int aot_test_device(const char* device_str) {
         if (device.is_cpu()) {
             results += "Device type: CPU\n";
         }
-#ifdef USE_CUDA
+#if defined(USE_HIP)
+        if (device.is_cuda()) {
+            hipDeviceProp_t props;
+            hipGetDeviceProperties(&props, device.index());
+            results += "Device name: " + std::string(props.name) + "\n";
+            results += "GCN arch: " + std::string(props.gcnArchName) + "\n";
+            results += "Total memory: " +
+                       std::to_string(props.totalGlobalMem / (1024 * 1024)) + " MB\n";
+        }
+#elif defined(USE_CUDA)
         if (device.is_cuda()) {
             cudaDeviceProp props;
             cudaGetDeviceProperties(&props, device.index());
             results += "Device name: " + std::string(props.name) + "\n";
             results += "Compute capability: " + std::to_string(props.major) + "." +
                        std::to_string(props.minor) + "\n";
-            results += "Total memory: " +
-                       std::to_string(props.totalGlobalMem / (1024 * 1024)) + " MB\n";
-        }
-#elif defined(USE_HIP)
-        if (device.is_cuda()) {
-            hipDeviceProp_t props;
-            hipGetDeviceProperties(&props, device.index());
-            results += "Device name: " + std::string(props.name) + "\n";
-            results += "GCN arch: " + std::string(props.gcnArchName) + "\n";
             results += "Total memory: " +
                        std::to_string(props.totalGlobalMem / (1024 * 1024)) + " MB\n";
         }
@@ -487,13 +487,13 @@ int aot_test_device(const char* device_str) {
         }
 
         // Synchronize to catch any async errors
-#ifdef USE_CUDA
-        if (device.is_cuda()) {
-            c10::cuda::device_synchronize();
-        }
-#elif defined(USE_HIP)
+#if defined(USE_HIP)
         if (device.is_cuda()) {
             c10::hip::device_synchronize();
+        }
+#elif defined(USE_CUDA)
+        if (device.is_cuda()) {
+            c10::cuda::device_synchronize();
         }
 #endif
 

@@ -44,7 +44,7 @@ python-preference = "only-system"
 package = false
 
 # PyTorch indexes for different backends
-# CUDA is the default. For ROCm, use: make init-training-rocm
+# CUDA is the default. For ROCm, use: make init BACKEND=rocm
 # Note: uv.lock pins CUDA torch; ROCm requires post-install replacement via uv pip
 
 # CUDA PyTorch - only use for torch packages (explicit = true)

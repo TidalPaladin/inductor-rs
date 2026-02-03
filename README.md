@@ -59,26 +59,24 @@ make build-portable
 #### CUDA (NVIDIA)
 
 ```bash
-# Install training dependencies (uses CUDA PyTorch from uv.lock)
-make init-training
+# Initialize CUDA environment
+make init BACKEND=cuda
 
 # Build with CUDA support
-make build-cuda
-# or: make build FEATURES=cuda
+make build BACKEND=cuda
 ```
 
 #### ROCm (AMD)
 
 ```bash
-# Install dependencies, then replace CUDA PyTorch with ROCm
-make init-training-rocm
+# Initialize ROCm environment (installs ROCm PyTorch)
+make init BACKEND=rocm
 
 # Build with ROCm support
-make build-rocm
-# or: make build FEATURES=rocm
+make build BACKEND=rocm
 ```
 
-**Important:** After `make init-training-rocm`, avoid `uv sync` or `uv run` as they will revert to CUDA PyTorch from uv.lock. Use `.venv/bin/python` directly.
+**Note:** CUDA uses `.venv-cuda` and ROCm uses `.venv-rocm`. Use the backend-specific `make` targets (or the venv's `python`) to avoid mixing environments.
 
 ### Environment Variables
 
@@ -140,22 +138,13 @@ Models must be exported to AOTInductor format before use:
 
 ```bash
 # Export for CPU
-TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
-    --output model-cpu.pt2 \
-    --device cpu \
-    --verify
+make export BACKEND=cpu MODEL_ARGS="--output model-cpu.pt2 --device cpu --verify"
 
 # Export for CUDA (requires CUDA PyTorch and NVIDIA GPU)
-TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
-    --output model-cuda.pt2 \
-    --device cuda \
-    --verify
+make export BACKEND=cuda MODEL_ARGS="--output model-cuda.pt2 --device cuda --verify"
 
 # Export for ROCm (requires ROCm PyTorch and AMD GPU)
-TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
-    --output model-rocm.pt2 \
-    --device cuda \
-    --verify
+make export BACKEND=rocm MODEL_ARGS="--output model-rocm.pt2 --device cuda --verify"
 ```
 
 **Note:** AOTInductor models are device-specific. A CPU model cannot run on GPU and vice versa. The .pt2 package contains architecture-specific kernels (HSACO for ROCm, cubin for CUDA).
@@ -168,7 +157,7 @@ TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
 |--------|---------------|------------|
 | Device string | `cuda:0`, `cuda:1` | `cuda:0` (HIP uses CUDA API) |
 | PyTorch index | `pytorch-cuda` (cu128) | `pytorch-rocm` (rocm7.0) |
-| Cargo feature | `--features cuda` | `--features rocm` |
+| Make backend | `BACKEND=cuda` | `BACKEND=rocm` |
 | C++ define | `USE_CUDA` | `USE_HIP`, `__HIP_PLATFORM_AMD__` |
 
 ### Library Loading
@@ -262,6 +251,16 @@ make test-python
 
 # Run all tests
 make test
+
+# Run CUDA + ROCm backend smoke tests (skips if GPU unavailable)
+make test-backends
+```
+
+If you have multiple GPUs, you can force a specific device for smoke tests:
+
+```bash
+# Run ROCm smoke test on device 1
+BACKEND=rocm BACKEND_DEVICE_INDEX=1 make test-backend
 ```
 
 ## Code Quality
@@ -296,13 +295,13 @@ System CUDA driver older than PyTorch's requirements.
 
 ### Feature mismatch errors
 
-Built with `--features cuda` but ROCm PyTorch installed (or vice versa).
+Built with `BACKEND=cuda` but ROCm PyTorch installed (or vice versa).
 
 **Fix:** Match feature to installed PyTorch:
 ```bash
 python -c "import torch; print(torch.__version__)"
-# 2.9.1+cu128 -> use --features cuda
-# 2.9.1+rocm7.0 -> use --features rocm
+# 2.9.1+cu128 -> use BACKEND=cuda
+# 2.9.1+rocm7.0 -> use BACKEND=rocm
 ```
 
 ## License

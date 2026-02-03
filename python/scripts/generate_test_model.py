@@ -114,7 +114,7 @@ def generate(
     return so_path
 
 
-def verify(model_path: str, height: int, width: int, device: str = "cpu") -> bool:
+def verify(model_path: str, height: int, width: int, device: str = "cpu", batch_size: int = 1) -> bool:
     """Verify the compiled model works correctly.
 
     Args:
@@ -133,13 +133,33 @@ def verify(model_path: str, height: int, width: int, device: str = "cpu") -> boo
 
     runner = load_package(model_path)
 
+    def run_runner(runner_obj, inputs):
+        if hasattr(runner_obj, "run"):
+            return runner_obj.run(inputs)
+        if hasattr(runner_obj, "forward"):
+            try:
+                return runner_obj.forward(*inputs)
+            except TypeError:
+                return runner_obj.forward(inputs)
+        if callable(runner_obj):
+            try:
+                return runner_obj(*inputs)
+            except TypeError:
+                return runner_obj(inputs)
+        raise RuntimeError(f"Unsupported runner type: {type(runner_obj)}")
+
     # Create test input
-    test_input = torch.randn(2, 1, height, width)
+    test_input = torch.randn(batch_size, 1, height, width)
     if device != "cpu":
         test_input = test_input.to(device)
 
     # Run inference
-    outputs = runner.run([test_input])
+    outputs = run_runner(runner, [test_input])
+
+    if isinstance(outputs, tuple):
+        outputs = list(outputs)
+    elif not isinstance(outputs, list):
+        outputs = [outputs]
 
     # Verify output count
     if len(outputs) != 3:
@@ -148,9 +168,9 @@ def verify(model_path: str, height: int, width: int, device: str = "cpu") -> boo
 
     # Verify shapes
     expected_shapes = [
-        (2,),  # output_0: scalar per batch
-        (2, height, width),  # output_1: spatial
-        (2, 5),  # output_2: feature vector
+        (batch_size,),  # output_0: scalar per batch
+        (batch_size, height, width),  # output_1: spatial
+        (batch_size, 5),  # output_2: feature vector
     ]
 
     names = ["output_0", "output_1", "output_2"]
@@ -235,7 +255,7 @@ def main():
     # Verify if requested
     if args.verify:
         try:
-            if not verify(so_path, args.height, args.width, args.device):
+            if not verify(so_path, args.height, args.width, args.device, args.batch_size):
                 sys.exit(1)
         except Exception as e:
             print(f"ERROR: Verification failed: {e}")

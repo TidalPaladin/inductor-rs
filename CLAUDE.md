@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Rust
 
 ```bash
-# Build the project (sets up .venv automatically via uv)
+# Build the project (sets up backend venv automatically via uv)
 make build
 
 # Debug build
@@ -17,10 +17,10 @@ make build-debug
 make build-portable
 
 # Build with CUDA support
-make build-cuda
+make build BACKEND=cuda
 
 # Build with ROCm support (AMD GPUs)
-make build-rocm
+make build BACKEND=rocm
 
 # Generate test fixtures (required before running tests)
 make test-fixtures
@@ -54,11 +54,11 @@ make fmt-cpp-check # C++ format check
 ### Python
 
 ```bash
-# Install training dependencies
-make init-training
+# Initialize CUDA environment
+make init BACKEND=cuda
 
-# For ROCm: Install dependencies then replace with ROCm PyTorch
-make init-training-rocm
+# Initialize ROCm environment (installs ROCm PyTorch)
+make init BACKEND=rocm
 
 # Individual Python checks
 make style      # Run ruff fix and format
@@ -70,22 +70,13 @@ make types      # Run basedpyright
 
 ```bash
 # Export model for CPU
-TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
-    --output model.pt2 \
-    --device cpu \
-    --verify
+make export BACKEND=cpu MODEL_ARGS="--output model.pt2 --device cpu --verify"
 
-# Export for CUDA (requires --features cuda build)
-TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
-    --output model-cuda.pt2 \
-    --device cuda \
-    --verify
+# Export for CUDA (requires CUDA build and NVIDIA GPU)
+make export BACKEND=cuda MODEL_ARGS="--output model-cuda.pt2 --device cuda --verify"
 
-# Export for ROCm (requires --features rocm build and AMD GPU)
-TORCH_COMPILE_DISABLE=1 python python/scripts/export_aot.py \
-    --output model-rocm.pt2 \
-    --device cuda \
-    --verify
+# Export for ROCm (requires ROCm build and AMD GPU)
+make export BACKEND=rocm MODEL_ARGS="--output model-rocm.pt2 --device cuda --verify"
 ```
 
 ## Project Overview
@@ -106,7 +97,7 @@ This is a template for running AOT-compiled PyTorch Inductor models in Rust. It 
    - Thread-local error handling
 
 2. **core/build.rs** - Rust build script
-   - Auto-detects PyTorch from `.venv/bin/python`
+   - Auto-detects PyTorch from the backend venv (`.venv`, `.venv-cuda`, `.venv-rocm`)
    - Validates feature/PyTorch compatibility
    - Manages library linking and RPATH
 
@@ -248,7 +239,7 @@ error: PyTorch/feature mismatch detected
   Cargo feature: cuda
   PyTorch installed: ROCm (rocm7.0)
 ```
-**Fix:** Run `make init-training` for CUDA or `make init-training-rocm` for ROCm.
+**Fix:** Run `make init BACKEND=cuda` for CUDA or `make init BACKEND=rocm` for ROCm.
 
 ### ROCm Library Initialization Failures
 **Cause:** `$ORIGIN` resolution issues with symlinked libraries.
@@ -276,6 +267,7 @@ error: PyTorch/feature mismatch detected
 2. Run Rust tests: `make test-rust`
 3. Run Python tests: `make test-python`
 4. Full test suite: `make test`
+5. Backend smoke tests: `make test-backends`
 
 ## Debugging
 

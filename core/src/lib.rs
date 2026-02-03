@@ -29,21 +29,20 @@
 //! # Building
 //!
 //! This crate requires PyTorch to be installed in the Python environment.
-//! The build script will automatically detect PyTorch from `.venv/bin/python`.
+//! The build script will automatically detect PyTorch from the backend venv
+//! (`.venv`, `.venv-cuda`, `.venv-rocm`).
 //!
 //! ```bash
-//! # Create venv and install PyTorch
-//! python -m venv .venv
-//! .venv/bin/pip install torch
+//! # Build (CPU)
+//! make build
 //!
-//! # Build
-//! cargo build --release
+//! # CUDA
+//! make init BACKEND=cuda
+//! make build BACKEND=cuda
 //!
-//! # With CUDA support
-//! cargo build --release --features cuda
-//!
-//! # With ROCm support
-//! cargo build --release --features rocm
+//! # ROCm
+//! make init BACKEND=rocm
+//! make build BACKEND=rocm
 //! ```
 
 pub mod cli;
