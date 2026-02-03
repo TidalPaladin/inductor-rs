@@ -212,10 +212,14 @@ const float *aot_tensor_data(AotTensor *tensor) {
   if (!tensor)
     return nullptr;
   try {
-    // Copy to CPU and/or make contiguous if needed
-    if (!tensor->tensor.is_cpu() || !tensor->tensor.is_contiguous()) {
+    // Copy to CPU, convert to float32, and/or make contiguous if needed
+    bool needs_conversion = !tensor->tensor.is_cpu() ||
+                            !tensor->tensor.is_contiguous() ||
+                            tensor->tensor.scalar_type() != torch::kFloat32;
+    if (needs_conversion) {
       if (!tensor->cpu_data_valid) {
-        torch::Tensor cpu_tensor = tensor->tensor.to(torch::kCPU).contiguous();
+        torch::Tensor cpu_tensor =
+            tensor->tensor.to(torch::kCPU, torch::kFloat32).contiguous();
         tensor->cpu_data.resize(cpu_tensor.numel());
         std::memcpy(tensor->cpu_data.data(), cpu_tensor.data_ptr<float>(),
                     cpu_tensor.numel() * sizeof(float));
