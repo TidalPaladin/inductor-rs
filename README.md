@@ -19,6 +19,30 @@ This template provides a complete infrastructure for running PyTorch models comp
 - CMake 3.18+
 - PyTorch 2.1+ (installed in Python environment)
 
+## Python Dependencies
+
+Dependencies are split into groups in `pyproject.toml` so training, export, and dev tooling stay isolated:
+
+- Base `project.dependencies`: minimal shared deps for AOT export/inference (keep this lean).
+- `training`: training-only libraries.
+- `export`: extra deps needed only for AOT export scripts.
+- `dev`: linting/testing/tooling.
+
+Examples:
+
+```bash
+# Minimal AOT export environment (base + export group)
+uv sync --group export
+
+# Training + dev environment
+uv sync --group training --group dev
+
+# Export + dev tooling
+uv sync --group export --group dev
+```
+
+`make init` uses the training + dev groups by default. If you want a minimal export-only environment, run `uv sync --group export` directly (or adjust the Makefile for your workflow).
+
 ## Quick Start
 
 ```bash

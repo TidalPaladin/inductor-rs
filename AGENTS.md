@@ -66,6 +66,28 @@ make quality    # Run ruff check
 make types      # Run basedpyright
 ```
 
+### Python Dependency Groups (uv)
+
+Keep Python dependencies isolated by using `pyproject.toml` groups:
+
+- Base `project.dependencies`: minimal shared deps needed for AOT export/inference. Keep this lean.
+- `training`: training-only libraries (datasets, visualization, etc.).
+- `export`: extra deps needed only for AOT export scripts.
+- `dev`: linting/testing/tooling.
+
+Usage examples (pick only what you need):
+
+```bash
+# Minimal AOT export environment (base + export group)
+uv sync --group export
+
+# Training + dev environment
+uv sync --group training --group dev
+
+# Export + dev tooling
+uv sync --group export --group dev
+```
+
 ### AOT Model Export
 
 ```bash
