@@ -1,6 +1,6 @@
 //! Command-line interface for inductor-rs.
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use std::path::PathBuf;
 
 /// Run AOT-compiled PyTorch Inductor models from Rust.
@@ -8,52 +8,37 @@ use std::path::PathBuf;
 #[command(name = "inductor-rs")]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-}
+    /// Path to the .pt2 model package.
+    ///
+    /// Required for inference mode.
+    #[arg(short, long)]
+    pub model: Option<PathBuf>,
 
-#[derive(Subcommand, Debug)]
-pub enum Commands {
-    /// Run inference on a model.
-    Infer {
-        /// Path to the .pt2 model package.
-        #[arg(short, long)]
-        model: PathBuf,
+    /// Device to run on (cpu, cuda:0, cuda:1, etc).
+    #[arg(short, long, default_value = "cpu")]
+    pub device: String,
 
-        /// Device to run inference on (cpu, cuda:0, cuda:1, etc).
-        #[arg(short, long, default_value = "cpu")]
-        device: String,
+    /// Path to input data file (JSON with tensor data).
+    ///
+    /// Required for inference mode.
+    #[arg(short, long)]
+    pub input: Option<PathBuf>,
 
-        /// Path to input data file (JSON with tensor data).
-        #[arg(short, long)]
-        input: PathBuf,
+    /// Output format (json, pretty).
+    #[arg(short, long, default_value = "json")]
+    pub format: String,
 
-        /// Output format (json, pretty).
-        #[arg(short, long, default_value = "json")]
-        format: String,
+    /// Path to optional config file (template only; not applied unless wired in).
+    #[arg(short, long)]
+    pub config: Option<PathBuf>,
 
-        /// Path to optional config file (template only; not applied unless wired in).
-        #[arg(short, long)]
-        config: Option<PathBuf>,
-    },
-
-    /// Show model information.
-    Info {
-        /// Path to the .pt2 model package.
-        #[arg(short, long)]
-        model: PathBuf,
-
-        /// Device to load model on.
-        #[arg(short, long, default_value = "cpu")]
-        device: String,
-    },
-
-    /// Test device capabilities.
-    TestDevice {
-        /// Device to test (cpu, cuda:0, cuda:1, etc).
-        #[arg(short, long, default_value = "cpu")]
-        device: String,
-    },
+    /// Run health checks instead of normal inference.
+    ///
+    /// Health checks include device diagnostics, build/runtime metadata,
+    /// optional model load validation, and optional inference smoke test
+    /// when both --model and --input are supplied.
+    #[arg(long)]
+    pub check: bool,
 }
 
 impl Cli {

@@ -104,14 +104,31 @@ def generate(
     output_dir = Path(output_path).parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use aoti_compile_and_package
-    so_path = torch._inductor.aoti_compile_and_package(
-        exported,
-        package_path=output_path,
-    )
+    # Use aoti_compile_and_package when available, otherwise package manually.
+    try:
+        from torch._inductor.aoti_compile_and_package import (  # pyright: ignore[reportMissingImports]
+            aoti_compile_and_package,
+        )
 
-    print(f"Generated: {so_path}")
-    return so_path
+        package_path = aoti_compile_and_package(exported, package_path=output_path)
+    except ImportError:
+        from torch._inductor import aot_compile  # pyright: ignore[reportMissingImports]
+        from torch._inductor.package import package_aoti  # pyright: ignore[reportPrivateImportUsage]
+
+        package_dir = str(Path(output_path).with_suffix(""))
+        aoti_files = aot_compile(
+            exported.module(),
+            (example_input,),
+            options={
+                "aot_inductor.package": True,
+                "aot_inductor.output_path": package_dir,
+            },
+        )
+        package_aoti(output_path, aoti_files)  # type: ignore[arg-type]
+        package_path = output_path
+
+    print(f"Generated: {package_path}")
+    return package_path
 
 
 def verify(model_path: str, height: int, width: int, device: str = "cpu", batch_size: int = 1) -> bool:
