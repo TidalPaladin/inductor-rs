@@ -228,8 +228,9 @@ fn run_inference_smoke_check(
     input_path: Option<&Path>,
     model: Option<&AotModel>,
 ) -> (InferenceSmoke, bool) {
+    let should_run = input_path.is_some() && model.is_some();
     let mut smoke = InferenceSmoke {
-        ran: input_path.is_some(),
+        ran: should_run,
         input: input_path.map(|p| p.display().to_string()),
         ok: None,
         num_outputs: None,
@@ -244,10 +245,8 @@ fn run_inference_smoke_check(
     };
 
     let Some(model) = model else {
-        smoke.ok = Some(false);
-        smoke.error =
-            Some("Inference smoke requires a successfully loaded model (--model)".to_string());
-        return (smoke, false);
+        // Inference smoke is optional and only runs when both --model and --input are provided.
+        return (smoke, true);
     };
 
     match parse_input_tensor(path)

@@ -291,9 +291,7 @@ def main():
             print(f"  Static export failed: {e}")
             print("  Retrying with strict=False...")
 
-        print("  Attempt 3/3: strict=False export")
-        if dynamic_shapes is not None:
-            return torch.export.export(model, example_inputs, strict=False, dynamic_shapes=dynamic_shapes)
+        print("  Attempt 3/3: static strict=False export")
         return torch.export.export(model, example_inputs, strict=False)
 
     exported = export_with_fallback()
