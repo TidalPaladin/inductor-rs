@@ -27,6 +27,7 @@ Dependencies are split into groups in `pyproject.toml` so training, export, and 
 - `training`: training-only libraries.
 - `export`: extra deps needed only for AOT export scripts.
 - `dev`: linting/testing/tooling.
+- `backend-cpu`, `backend-cuda`, `backend-rocm`: backend-specific torch/torchvision pins.
 
 Examples:
 
@@ -34,14 +35,17 @@ Examples:
 # Minimal AOT export environment (base + export group)
 uv sync --group export
 
-# Training + dev environment
-uv sync --group training --group dev
+# CPU dev environment
+uv sync --group training --group dev --group export --group backend-cpu
 
-# Export + dev tooling
-uv sync --group export --group dev
+# CUDA dev environment
+uv sync --group training --group dev --group export --group backend-cuda
+
+# ROCm dev environment
+uv sync --group training --group dev --group export --group backend-rocm
 ```
 
-`make init` uses the training + dev groups by default. If you want a minimal export-only environment, run `uv sync --group export` directly (or adjust the Makefile for your workflow).
+`make init BACKEND=...` installs frozen, backend-specific groups via `uv sync --frozen --no-default-groups`.
 
 ## Quick Start
 
@@ -57,7 +61,7 @@ make
 make test-fixtures
 
 # Run inference
-./target/release/inductor-rs infer \
+./target/release/inductor-rs \
     --model tests/fixtures/dummy_model.pt2 \
     --device cpu \
     --input tests/fixtures/input.json
@@ -118,14 +122,13 @@ make build BACKEND=rocm
 ### CLI Commands
 
 ```bash
-# Run inference
-inductor-rs infer --model model.pt2 --device cpu --input tests/fixtures/input.json
+# Run inference (default mode)
+inductor-rs --model model.pt2 --device cpu --input tests/fixtures/input.json
 
-# Show model info
-inductor-rs info --model model.pt2
-
-# Test device capabilities
-inductor-rs test-device --device cuda:0
+# Run health checks (device diagnostics, build/runtime metadata, optional model/inference checks)
+inductor-rs --check --device cuda:0
+inductor-rs --check --model model.pt2 --device cpu
+inductor-rs --check --model model.pt2 --input tests/fixtures/input.json --device cpu --format pretty
 ```
 
 ### Input Format
@@ -187,6 +190,7 @@ make export BACKEND=rocm MODEL_ARGS="--output model-rocm.pt2 --device cuda --ver
 - Cast outputs to a consistent dtype (typically `float32`).
 - Store sizes as Python `int`, not tensors, to avoid guard errors.
 - If you have `@torch.compile` decorators, set `TORCH_COMPILE_DISABLE=1` during export to avoid FakeTensorMode conflicts.
+- The template export script tries dynamic-batch export first, then static export, then `strict=False` fallback.
 
 ### Verify the Export
 
@@ -336,6 +340,9 @@ make test-python
 
 # Run all tests
 make test
+
+# Verify portable runtime bundle is self-contained
+make verify-portable BACKEND=cpu
 
 # Run CUDA + ROCm backend smoke tests (skips if GPU unavailable)
 make test-backends

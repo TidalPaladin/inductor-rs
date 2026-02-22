@@ -215,7 +215,9 @@ fn build_aot_bridge() {
         (PathBuf::from(path), python)
     } else if let Some((path, python)) = detect_libtorch_from_python() {
         let msg = format!("Auto-detected PyTorch from Python: {}", path.display());
-        let warn = env::var("AOT_WARN_LTORCH").map(|v| v == "1").unwrap_or(false);
+        let warn = env::var("AOT_WARN_LTORCH")
+            .map(|v| v == "1")
+            .unwrap_or(false);
         if warn {
             println!("cargo:warning={}", msg);
         } else {
@@ -294,19 +296,24 @@ fn build_aot_bridge() {
         format!("-D_GLIBCXX_USE_CXX11_ABI={}", cxx11_abi),
     );
 
-    // Check for CUDA feature
-    if cfg!(feature = "cuda") {
-        cmake_config.define("USE_CUDA", "ON");
-    }
+    // Ensure backend switches reset cached CMake options.
+    cmake_config.define(
+        "USE_CUDA",
+        if cfg!(feature = "cuda") { "ON" } else { "OFF" },
+    );
+    cmake_config.define("USE_HIP", if cfg!(feature = "rocm") { "ON" } else { "OFF" });
 
     // Check for ROCm feature
     if cfg!(feature = "rocm") {
-        cmake_config.define("USE_HIP", "ON");
         // Pass ROCM_PATH to CMake if set
         if let Ok(rocm_path) = env::var("ROCM_PATH") {
             cmake_config.define("ROCM_PATH", rocm_path);
         }
     }
+
+    // Avoid mixing stale CUDA/HIP settings when switching backends.
+    // By default, the cmake crate reuses its cache unless this is disabled.
+    cmake_config.always_configure(true);
 
     // Check if libtorch has CUDA support by looking for CUDA cmake files
     let libtorch_has_cuda = libtorch

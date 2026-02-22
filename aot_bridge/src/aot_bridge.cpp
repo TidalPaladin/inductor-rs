@@ -23,10 +23,12 @@
 #ifdef USE_CUDA
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAFunctions.h>
+#include <cuda_runtime_api.h>
 #endif
 #ifdef USE_HIP
 #include <c10/hip/HIPCachingAllocator.h>
 #include <c10/hip/HIPFunctions.h>
+#include <hip/hip_runtime_api.h>
 #endif
 
 /* Thread-local error message */

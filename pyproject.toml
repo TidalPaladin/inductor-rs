@@ -9,7 +9,6 @@ description = "Python tools for AOT model export"
 requires-python = ">=3.13"
 authors = [{ name = "Your Name", email = "you@example.com" }]
 dependencies = [
-    "torch>=2.1",
     "safetensors",
     "pyyaml",
 ]
@@ -21,7 +20,6 @@ text = "Apache-2.0"
 [dependency-groups]
 # Training dependencies - customize for your model
 training = [
-    "torchvision",
     "pandas",
     "matplotlib",
     "tqdm",
@@ -37,32 +35,46 @@ dev = [
     "pytest",
 ]
 
+# Backend-specific PyTorch dependency groups
+backend-cpu = [
+    "torch==2.10.0+cpu",
+    "torchvision==0.25.0+cpu",
+]
+
+backend-cuda = [
+    "torch==2.10.0+cu128",
+    "torchvision==0.25.0+cu128",
+]
+
+backend-rocm = [
+    "torch==2.10.0+rocm7.0",
+    "torchvision==0.25.0+rocm7.0",
+]
+
 [tool.uv]
 # Prefer system Python over downloading managed versions
 python-preference = "only-system"
 # Don't build this as a Python package - just install dependencies
 package = false
+index-strategy = "unsafe-best-match"
+conflicts = [
+    [{ group = "backend-cpu" }, { group = "backend-cuda" }],
+    [{ group = "backend-cpu" }, { group = "backend-rocm" }],
+    [{ group = "backend-cuda" }, { group = "backend-rocm" }],
+]
 
-# PyTorch indexes for different backends
-# CUDA is the default. For ROCm, use: make init BACKEND=rocm
-# Note: uv.lock pins CUDA torch; ROCm requires post-install replacement via uv pip
-
-# CUDA PyTorch - only use for torch packages (explicit = true)
+# PyTorch indexes for different backends.
 [[tool.uv.index]]
 name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu128"
-explicit = true
 
-# ROCm PyTorch (available for reference; use Makefile target for installation)
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+
 [[tool.uv.index]]
 name = "pytorch-rocm"
 url = "https://download.pytorch.org/whl/rocm7.0"
-explicit = true
-
-# Pin torch packages to CUDA index
-[tool.uv.sources]
-torch = { index = "pytorch-cuda" }
-torchvision = { index = "pytorch-cuda" }
 
 [tool.ruff]
 line-length = 120

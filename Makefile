@@ -21,6 +21,7 @@ endif
 VENV_DIR := $(if $(filter cpu,$(BACKEND)),.venv,.venv-$(BACKEND))
 PYTHON := $(VENV_DIR)/bin/python
 UV_ENV := UV_PROJECT_ENVIRONMENT=$(VENV_DIR)
+BACKEND_GROUP := backend-$(BACKEND)
 
 CARGO_FEATURES := $(if $(filter cuda,$(BACKEND)),--features cuda,$(if $(filter rocm,$(BACKEND)),--features rocm,))
 
@@ -42,17 +43,10 @@ build-portable: $(VENV_DIR)/.installed
 # Create venv and install deps from uv.lock
 # Touch .installed marker to track when deps were last synced
 $(VENV_DIR)/.installed: pyproject.toml uv.lock
-	$(UV_ENV) uv sync --group training --group dev
-	@if [ "$(BACKEND)" = "rocm" ]; then \
-		echo "Replacing CUDA PyTorch with ROCm PyTorch..."; \
-		uv pip install -p $(PYTHON) pip; \
-		$(PYTHON) -m pip uninstall -y torch torchvision || true; \
-		$(PYTHON) -m pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm7.0; \
-		echo "ROCm PyTorch installed. Verify with: $(PYTHON) -c \"import torch; print(torch.version.hip)\""; \
-	fi
+	$(UV_ENV) UV_INDEX_STRATEGY=unsafe-best-match uv sync --frozen --no-default-groups --group training --group dev --group export --group $(BACKEND_GROUP)
 	@touch $(VENV_DIR)/.installed
 
-# Initialize environment (installs training + dev deps)
+# Initialize environment
 init:
 	$(MAKE) -B $(VENV_DIR)/.installed BACKEND=$(BACKEND)
 
@@ -80,7 +74,7 @@ fmt-check:
 	cd core && cargo fmt --check
 
 clippy: $(VENV_DIR)/.installed
-	cd core && cargo clippy --release $(CARGO_FEATURES) -- -D warnings
+	cd core && AOT_BRIDGE_SKIP_BUILD=1 cargo clippy --release $(CARGO_FEATURES) -- -D warnings
 
 .PHONY: fmt fmt-check clippy
 
@@ -154,10 +148,10 @@ test-backend: $(VENV_DIR)/.installed
 		exit 1; \
 	fi; \
 	rc=0; \
-	device_index=$$($(PYTHON) python/scripts/check_backend.py --print-index) || rc=$$?; \
+	device_index=$$(BACKEND=$(BACKEND) $(PYTHON) python/scripts/check_backend.py --print-index) || rc=$$?; \
 	if [ $$rc -eq 2 ]; then exit 0; fi; \
 	if [ $$rc -ne 0 ]; then exit $$rc; fi; \
-	cd core && cargo build --release $(CARGO_FEATURES) && ../target/release/inductor-rs test-device --device cuda:$$device_index
+	cd core && cargo build --release $(CARGO_FEATURES) && ../target/release/inductor-rs --check --device cuda:$$device_index
 
 # Run CUDA and ROCm smoke tests
 test-backends:
@@ -168,6 +162,24 @@ test-backends:
 	done
 
 .PHONY: test-fixtures test-rust test-python test test-backend test-backends
+
+# Verify a portable build runs without host environment library paths.
+verify-portable: build-portable
+	@if [ ! -x "target/portable/release/inductor-rs" ]; then \
+		echo "Error: portable binary missing at target/portable/release/inductor-rs"; \
+		exit 1; \
+	fi
+	@if [ ! -d "target/portable/release/lib" ]; then \
+		echo "Error: portable runtime libs missing at target/portable/release/lib"; \
+		exit 1; \
+	fi
+	@tmp_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	cp "target/portable/release/inductor-rs" "$$tmp_dir/inductor-rs"; \
+	cp -a "target/portable/release/lib" "$$tmp_dir/lib"; \
+	env -u LD_LIBRARY_PATH "$$tmp_dir/inductor-rs" --help >/dev/null
+
+.PHONY: verify-portable
 
 # ============================================================
 # Documentation

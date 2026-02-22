@@ -269,7 +269,32 @@ def main():
 
     # Export using torch.export
     print("Exporting model with torch.export...")
-    exported = torch.export.export(model, example_inputs)
+
+    def export_with_fallback() -> torch.export.ExportedProgram:
+        dynamic_shapes = None
+
+        # Try dynamic batch first when there is exactly one tensor input.
+        if len(example_inputs) == 1 and example_inputs[0].ndim > 0:
+            batch_dim = torch.export.Dim("batch", min=1, max=max(args.batch_size, 32))
+            dynamic_shapes = ({0: batch_dim},)
+            try:
+                print("  Attempt 1/3: dynamic batch export")
+                return torch.export.export(model, example_inputs, dynamic_shapes=dynamic_shapes)
+            except Exception as e:
+                print(f"  Dynamic export failed: {e}")
+                print("  Falling back to static export...")
+
+        try:
+            print("  Attempt 2/3: static export")
+            return torch.export.export(model, example_inputs)
+        except Exception as e:
+            print(f"  Static export failed: {e}")
+            print("  Retrying with strict=False...")
+
+        print("  Attempt 3/3: static strict=False export")
+        return torch.export.export(model, example_inputs, strict=False)
+
+    exported = export_with_fallback()
 
     # Compile with AOTInductor
     print(f"Compiling with AOTInductor to {args.output}...")
